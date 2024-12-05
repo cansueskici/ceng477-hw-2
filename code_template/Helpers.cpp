@@ -1,7 +1,9 @@
 #include <iostream>
 #include <cmath>
 #include "Helpers.h"
-
+#include "Translation.h"
+#include "Scaling.h"
+#include "Rotation.h"
 /*
  * Calculate cross product of vec3 a, vec3 b and return resulting vec3.
  */
@@ -163,4 +165,53 @@ Vec4 multiplyMatrixWithVec4(Matrix4 m, Vec4 v)
     }
 
     return Vec4(values[0], values[1], values[2], values[3], v.colorId);
+}
+
+
+
+Matrix4 translate(Translation *translation){
+    Matrix4 translationMatrix = getIdentityMatrix();
+
+    translationMatrix.values[0][3] = translation->tx;
+    translationMatrix.values[1][3] = translation->ty;
+    translationMatrix.values[2][3] = translation->tz;
+
+    return translationMatrix;
+}
+
+Matrix4 scale(Scaling *scaling){
+    Matrix4 scalingMatrix = getIdentityMatrix();
+    scalingMatrix.values[0][0] = scaling->sx;
+    scalingMatrix.values[1][1] = scaling->sy;
+    scalingMatrix.values[2][2] = scaling->sz;
+
+    return scalingMatrix;
+}
+
+
+Matrix4 rotate(Rotation *rotation){
+    Matrix4 rotationMatrix = getIdentityMatrix();
+    double angle_radians = (rotation->angle * M_PI)/180.0;
+    int axis; // x = 1, y= 2, z= 3
+    // TODO
+
+    if(axis == 1){
+        rotationMatrix.values[1][1] = cos(angle_radians);
+        rotationMatrix.values[1][2] = -sin(angle_radians);
+        rotationMatrix.values[2][1] = sin(angle_radians);
+        rotationMatrix.values[2][2] = cos(angle_radians);
+
+    }else if(axis == 2){
+        rotationMatrix.values[0][0] = cos(angle_radians);
+        rotationMatrix.values[0][2] = sin(angle_radians);
+        rotationMatrix.values[2][0] = -sin(angle_radians);
+        rotationMatrix.values[2][2] = cos(angle_radians);
+
+    }else{
+        rotationMatrix.values[0][0] = cos(angle_radians);
+        rotationMatrix.values[0][1] = -sin(angle_radians);
+        rotationMatrix.values[1][0] = sin(angle_radians);
+        rotationMatrix.values[1][1] = cos(angle_radians);
+    }
+
 }

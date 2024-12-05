@@ -358,7 +358,11 @@ void Scene::convertPPMToPNG(string ppmFileName, int osType)
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
-void Scene::forwardRenderingPipeline(Camera *camera)
-{
+void Scene::forwardRenderingPipeline(Camera *camera){
 	// TODO: Implement this function
+
+
+
+
+
 }
