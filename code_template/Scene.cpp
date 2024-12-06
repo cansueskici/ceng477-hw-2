@@ -415,6 +415,25 @@ Matrix4 rotate(Rotation *rotation, Matrix4 matrix){
 
 }
 
+
+Matrix4 modeling_transformation(Scene *scene, Mesh *mesh){
+    Matrix4 result = getIdentityMatrix();
+
+    for (int i = 0; i < mesh->numberOfTransformations; ++i) {
+        char type = mesh->transformationTypes[i];
+        int id = mesh->transformationIds[i]-1;
+        if (type == 's'){
+            scale(scene->scalings[i], result);
+        }else if(type == 't'){
+            translate(scene->translations[i], result);
+        }else{
+            rotate(scene->rotations[i], result);
+        }
+    }
+    return result;
+}
+
+
 bool is_visible(double diff, double num, double t_e, double t_l){
     double t;
     if(diff > 0){
@@ -495,9 +514,7 @@ Matrix4 cameraTransformation(Camera *cam){
     return result;
 }
 
-Matrix4 projection(Camera *cam){}
-
-Matrix4 viewportTransformation(Camera *cam){
+Matrix4 projection(Camera *cam){
     double l = cam->left, r = cam->right, b = cam->bottom, t = cam->top, n = cam->near, f = cam->far;
     Matrix4 p2o;
     Matrix4 m_orth = getIdentityMatrix();
@@ -526,8 +543,36 @@ Matrix4 viewportTransformation(Camera *cam){
         return m_orth;
     }
 
+}
+
+Matrix4 viewportTransformation(Camera *cam){
+    double nx = cam->horRes, ny = cam->verRes;
+    Matrix4 m_vp = getIdentityMatrix();
+    m_vp.values[0][0] = nx/2;
+    m_vp.values[0][3] = (nx-1)/2;
+    m_vp.values[1][1] = ny/2;
+    m_vp.values[1][3] = (ny-1)/2;
+    m_vp.values[2][2] = 0.5;
+    m_vp.values[2][3] = 0.5;
 
 }
+
+Vec4 perspectiveDivide(Vec4 vec){
+
+    if (vec.t == 1){
+        return vec;
+    }
+
+    if (vec.t != 0){
+        vec.x = vec.x/vec.t;
+        vec.y = vec.y/vec.t;
+        vec.z = vec.z/vec.t;
+        vec.t = 1.0;
+    }
+
+    return vec;
+}
+
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -548,16 +593,19 @@ void Scene::forwardRenderingPipeline(Camera *camera){
      * */
 
 
-    //camera transformations here
     Matrix4 camera_transformed = cameraTransformation(camera);
-    // TODO Matrix4 projected = projection(camera) ;
-    // TODO Matrix4 viewport = viewportTransformation(camera);
+    Matrix4 projected = projection(camera);
+    Matrix4 viewport = viewportTransformation(camera);
+    Matrix4 p_c= projected*camera_transformed;
 
+    for (Mesh *mesh : this->meshes) {
+        Matrix4 model_transformed = modeling_transformation(this, mesh);
 
+        for (int i = 0; i < mesh->numberOfTriangles; ++i) {
+            //triangle rasterization
+        }
 
-    for (int i = 0; i < meshes.size(); ++i) {
-        Matrix4 modelingMatrix, projectionMatrix, viewportMatrix;
-        //modelingMatrix = model tr
     }
+
 
 }
