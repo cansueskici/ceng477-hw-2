@@ -484,15 +484,50 @@ bool clipping(Camera *cam, Vec4 point1, Vec4 point2){
 }
 
 Matrix4 cameraTransformation(Camera *cam){
-    double cam_position_product1 =-1*(cam->u.x*cam->position.x + cam->u.y*cam->position.y + cam->u.z*cam->position.z);
-    double cam_position_product2 =-1*(cam->v.x*cam->position.x + cam->v.y*cam->position.y + cam->v.z*cam->position.z);
-    double cam_position_product3 =-1*(cam->w.x*cam->position.x + cam->w.y*cam->position.y + cam->w.z*cam->position.z);
-    double m_cam_values[4][4] = {{cam->u.x, cam->u.y, cam->u.z,cam_position_product1 }, {cam->v.x, cam->v.y, cam->v.z, cam_position_product2}, {cam->w.x, cam->w.y, cam->w.z, cam_position_product3}, {0, 0, 0, 1}};
+    double cam_position_product1 =-1.0*(dotProductVec3(cam->u, cam->position));
+    double cam_position_product2 =-1.0*(dotProductVec3(cam->v, cam->position));
+    double cam_position_product3 =-1.0*(dotProductVec3(cam->w, cam->position));
+    double m_cam_values[4][4] = {{cam->u.x, cam->u.y, cam->u.z,cam_position_product1 },
+                                 {cam->v.x, cam->v.y, cam->v.z, cam_position_product2},
+                                 {cam->w.x, cam->w.y, cam->w.z, cam_position_product3},
+                                 {0, 0, 0, 1}};
     Matrix4 result(m_cam_values);
     return result;
 }
 
+Matrix4 projection(Camera *cam){}
 
+Matrix4 viewportTransformation(Camera *cam){
+    double l = cam->left, r = cam->right, b = cam->bottom, t = cam->top, n = cam->near, f = cam->far;
+    Matrix4 p2o;
+    Matrix4 m_orth = getIdentityMatrix();
+    double r_l = r - l, t_b = t - b, f_n = f - n;
+
+    m_orth.values[0][0] = 2/r_l;
+    m_orth.values[0][3] = -1*(r+r)/r_l;
+    m_orth.values[1][1] = 2/t_b;
+    m_orth.values[1][3] = -1*(t+b)/t_b;
+    m_orth.values[2][2] = -2/f_n;
+    m_orth.values[2][3] = -1*(f+n)/f_n;
+
+
+    if(!cam->projectionType){
+        //do perspective projection
+        p2o.values[0][0] = n;
+        p2o.values[1][1] = n;
+        p2o.values[2][2] = f+n;
+        p2o.values[2][3] = f*n;
+        p2o.values[3][2] = -1;
+
+        Matrix4 m_per = m_orth*p2o;
+        return m_per;
+
+    } else{
+        return m_orth;
+    }
+
+
+}
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -514,6 +549,10 @@ void Scene::forwardRenderingPipeline(Camera *camera){
 
 
     //camera transformations here
+    Matrix4 camera_transformed = cameraTransformation(camera);
+    // TODO Matrix4 projected = projection(camera) ;
+    // TODO Matrix4 viewport = viewportTransformation(camera);
+
 
 
     for (int i = 0; i < meshes.size(); ++i) {
