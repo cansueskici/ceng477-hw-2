@@ -355,14 +355,87 @@ void Scene::convertPPMToPNG(string ppmFileName, int osType)
 }
 
 
+Matrix4 translate(Translation *translation, Matrix4 matrix){
+    Matrix4 translationMatrix = getIdentityMatrix();
+
+    translationMatrix.values[0][3] = translation->tx;
+    translationMatrix.values[1][3] = translation->ty;
+    translationMatrix.values[2][3] = translation->tz;
+
+    return translationMatrix*matrix;
+}
+
+Matrix4 scale(Scaling *scaling, Matrix4 matrix){
+    Matrix4 scalingMatrix = getIdentityMatrix();
+    scalingMatrix.values[0][0] = scaling->sx;
+    scalingMatrix.values[1][1] = scaling->sy;
+    scalingMatrix.values[2][2] = scaling->sz;
+
+    return scalingMatrix*matrix;
+}
+
+
+Matrix4 rotate(Rotation *rotation, Matrix4 matrix){
+    Vec3 u(rotation->ux, rotation->uy, rotation->uz), v, w;
+    u = normalizeVec3(u);
+    double angle_radians = (rotation->angle * M_PI)/180.0;
+    double smallest = std::min({abs(u.x), abs(u.y), abs(u.z)});
+
+    if (smallest == abs(u.x)){
+        v.x = 0.0;
+        v.y = -u.z;
+        v.z = u.y;
+    }else if(smallest == abs(u.y)){
+        v.x = -u.z;
+        v.y = 0.0;
+        v.z = u.x;
+    } else{
+        v.x = u.y;
+        v.y = -u.x;
+        v.z = 0.0;
+    }
+
+    w = crossProductVec3(u, v);
+    v = normalizeVec3(v);
+    w = normalizeVec3(w);
+
+    double m_inverse_values[4][4] = {{u.x, v.x, w.x, 0}, {u.y, v.y, w.y, 0}, {u.z, v.z, w.z, 0}, {0, 0, 0, 1}};
+    Matrix4 m_inverse(m_inverse_values);
+
+    double m_values[4][4] = {{u.x, u.y, u.z, 0}, {v.x, v.y, v.z, 0}, {w.x, w.y, w.z, 0}, {0, 0, 0, 1}};
+    Matrix4 m(m_values);
+
+    Matrix4 rotationMatrix = getIdentityMatrix();
+    rotationMatrix.values[1][1] = cos(angle_radians);
+    rotationMatrix.values[1][2] = sin(angle_radians)*(-1.0);
+    rotationMatrix.values[2][1] = sin(angle_radians);
+    rotationMatrix.values[2][2] = cos(angle_radians);
+
+    return m_inverse*(rotationMatrix*(m*matrix));
+
+}
+
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
 void Scene::forwardRenderingPipeline(Camera *camera){
 	// TODO: Implement this function
+    /*
+     * model transformations
+     *
+     * camera transformations
+     *
+     * clipping & culling (backface culling)
+     *
+     * projection transformation
+     *
+     * rasterization (also color calculations) (solid vs wireframe aaaa)
+     *
+     * */
 
 
-
-
+    for (int i = 0; i < meshes.size(); ++i) {
+        Matrix4 modelingMatrix, projectionMatrix, viewportMatrix;
+    }
 
 }
