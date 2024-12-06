@@ -415,6 +415,85 @@ Matrix4 rotate(Rotation *rotation, Matrix4 matrix){
 
 }
 
+bool is_visible(double diff, double num, double t_e, double t_l){
+    double t;
+    if(diff > 0){
+        t = num/diff;
+
+        if (t > t_l){
+            return false;
+        }
+        if (t > t_e){
+            t_e = t;
+        }
+    } else if(diff < 0){
+        t = num/diff;
+
+        if (t < t_e){
+            return false;
+
+        } else if(t < t_l){
+            t_l = t;
+        }
+    } else if(num > 0){
+        return false;
+    }
+
+    return true;
+}
+
+bool clipping(Camera *cam, Vec4 point1, Vec4 point2){
+    //each line will enter and leave twice,
+    // if first L(eave) is before last E(ntrance) -> not visible/False
+    // if t_pl < t_pe : return false
+
+    bool visible = false;
+    double t_pe = 0, t_pl = 1;
+    double dx = point2.x - point1.x;
+    double dy = point2.y - point1.y;
+    double dz = point2.z - point1.z;
+    double xmin = -1, ymin = -1, zmin = -1;
+    double xmax = 1, ymax = 1, zmax = 1;
+
+    if(is_visible(dx, xmin-point1.x, t_pe, t_pl)){
+        if (is_visible(dx*(-1), (point1.x-xmax), t_pe, t_pl)){
+            if (dy, (ymin-point1.y), t_pe, t_pl){
+                if (dy*(-1), (point1.y-ymax), t_pe, t_pl ){
+                    if (dz, (zmin -point1.z ),t_pe, t_pl){
+                        if (dz*(-1), (point1.z - zmax),t_pe, t_pl){
+                            visible = true;
+                            if(t_pl < 1){
+                                point2.x = point1.x + dx*t_pl;
+                                point2.y = point1.y + dy*t_pl;
+                                point2.z = point1.z + dz*t_pl;
+                            }
+
+                            if (t_pe > 0){
+                                point1.x = point1.x + dx*t_pe;
+                                point1.y = point1.y + dy*t_pe;
+                                point1.z = point1.z + dz*t_pe;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return visible;
+}
+
+Matrix4 cameraTransformation(Camera *cam){
+    double cam_position_product1 =-1*(cam->u.x*cam->position.x + cam->u.y*cam->position.y + cam->u.z*cam->position.z);
+    double cam_position_product2 =-1*(cam->v.x*cam->position.x + cam->v.y*cam->position.y + cam->v.z*cam->position.z);
+    double cam_position_product3 =-1*(cam->w.x*cam->position.x + cam->w.y*cam->position.y + cam->w.z*cam->position.z);
+    double m_cam_values[4][4] = {{cam->u.x, cam->u.y, cam->u.z,cam_position_product1 }, {cam->v.x, cam->v.y, cam->v.z, cam_position_product2}, {cam->w.x, cam->w.y, cam->w.z, cam_position_product3}, {0, 0, 0, 1}};
+    Matrix4 result(m_cam_values);
+    return result;
+}
+
+
+
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
@@ -434,8 +513,12 @@ void Scene::forwardRenderingPipeline(Camera *camera){
      * */
 
 
+    //camera transformations here
+
+
     for (int i = 0; i < meshes.size(); ++i) {
         Matrix4 modelingMatrix, projectionMatrix, viewportMatrix;
+        //modelingMatrix = model tr
     }
 
 }
