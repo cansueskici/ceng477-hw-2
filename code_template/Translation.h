@@ -10,7 +10,6 @@ public:
 
     Translation();
     Translation(int translationId, double tx, double ty, double tz);
-    Matrix4 translate();
     friend std::ostream &operator<<(std::ostream &os, const Translation &t);
 };
 
