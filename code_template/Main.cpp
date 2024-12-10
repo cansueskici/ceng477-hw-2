@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
         {
             // initialize image with basic values
             scene->initializeImage(scene->cameras[i]);
+            scene->initializeDepthBuffer(scene->cameras[i]);
 
             // do forward rendering pipeline operations
             scene->forwardRenderingPipeline(scene->cameras[i]);

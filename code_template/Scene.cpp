@@ -254,32 +254,32 @@ Scene::Scene(const char *xmlPath)
 */
 void Scene::initializeImage(Camera *camera)
 {
-	if (this->image.empty())
-	{
-		for (int i = 0; i < camera->horRes; i++)
-		{
-			vector<Color> rowOfColors;
+    if (this->image.empty())
+    {
+        for (int i = 0; i < camera->horRes; i++)
+        {
+            vector<Color> rowOfColors;
 
-			for (int j = 0; j < camera->verRes; j++)
-			{
-				rowOfColors.push_back(this->backgroundColor);
-			}
+            for (int j = 0; j < camera->verRes; j++)
+            {
+                rowOfColors.push_back(this->backgroundColor);
+            }
 
-			this->image.push_back(rowOfColors);
-		}
-	}
-	else
-	{
-		for (int i = 0; i < camera->horRes; i++)
-		{
-			for (int j = 0; j < camera->verRes; j++)
-			{
-				this->image[i][j].r = this->backgroundColor.r;
-				this->image[i][j].g = this->backgroundColor.g;
-				this->image[i][j].b = this->backgroundColor.b;
-			}
-		}
-	}
+            this->image.push_back(rowOfColors);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < camera->horRes; i++)
+        {
+            for (int j = 0; j < camera->verRes; j++)
+            {
+                this->image[i][j].r = this->backgroundColor.r;
+                this->image[i][j].g = this->backgroundColor.g;
+                this->image[i][j].b = this->backgroundColor.b;
+            }
+        }
+    }
 }
 
 /*
@@ -355,32 +355,62 @@ void Scene::convertPPMToPNG(string ppmFileName, int osType)
 }
 
 
-Matrix4 Scene::translate(Translation *translation, Matrix4 matrix){
+void Scene::initializeDepthBuffer(Camera *camera)
+{
+    if (this->depthBuffer.empty())
+    {
+        for (int i = 0; i < camera->horRes; i++)
+        {
+            std::vector<double> rowOfDepths;
+
+            for (int j = 0; j < camera->verRes; j++)
+            {
+                rowOfDepths.push_back(std::numeric_limits<double>::infinity());
+            }
+
+            this->depthBuffer.push_back(rowOfDepths);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < camera->horRes; i++)
+        {
+            for (int j = 0; j < camera->verRes; j++)
+            {
+                this->depthBuffer[i][j] = std::numeric_limits<double>::infinity();
+            }
+        }
+    }
+
+}
+
+
+Matrix4 Scene::translate(Translation *translation, Matrix4 &matrix){
     Matrix4 translationMatrix = getIdentityMatrix();
 
     translationMatrix.values[0][3] = translation->tx;
     translationMatrix.values[1][3] = translation->ty;
     translationMatrix.values[2][3] = translation->tz;
 
-    return translationMatrix*matrix;
+    return multiplyMatrixWithMatrix(translationMatrix, matrix);
 }
 
 
-Matrix4 Scene::scale(Scaling *scaling, Matrix4 matrix){
+Matrix4 Scene::scale(Scaling *scaling, Matrix4 &matrix){
     Matrix4 scalingMatrix = getIdentityMatrix();
     scalingMatrix.values[0][0] = scaling->sx;
     scalingMatrix.values[1][1] = scaling->sy;
     scalingMatrix.values[2][2] = scaling->sz;
 
-    return scalingMatrix*matrix;
+    return multiplyMatrixWithMatrix(scalingMatrix, matrix);
 }
 
 
-Matrix4 Scene::rotate(Rotation *rotation, Matrix4 matrix){
+Matrix4 Scene::rotate(Rotation *rotation, Matrix4 &matrix){
     Vec3 u(rotation->ux, rotation->uy, rotation->uz), v, w;
     u = normalizeVec3(u);
     double angle_radians = (rotation->angle * M_PI)/180.0;
-    double smallest = std::min({abs(u.x), abs(u.y), abs(u.z)});
+    double smallest = min(u.x, min(u.y, u.z));
 
     if (smallest == abs(u.x)){
         v.x = 0.0;
@@ -412,34 +442,34 @@ Matrix4 Scene::rotate(Rotation *rotation, Matrix4 matrix){
     rotationMatrix.values[2][1] = sin(angle_radians);
     rotationMatrix.values[2][2] = cos(angle_radians);
 
-    return m_inverse*(rotationMatrix*(m*matrix));
+    return multiplyMatrixWithMatrix(m_inverse, multiplyMatrixWithMatrix(rotationMatrix, multiplyMatrixWithMatrix(m,matrix)));
 
 }
 
 
-Matrix4 Scene::modeling_transformation(Scene *scene, Mesh *mesh){
+Matrix4 Scene::modeling_transformation(Mesh *mesh){
     Matrix4 result = getIdentityMatrix();
 
     for (int i = 0; i < mesh->numberOfTransformations; ++i) {
         char type = mesh->transformationTypes[i];
         int id = mesh->transformationIds[i]-1;
+
         if (type == 's'){
-            scale(scene->scalings[i], result);
+            result = scale(scalings[id], result);
         }else if(type == 't'){
-            translate(scene->translations[i], result);
+            result = translate(translations[id], result);
         }else{
-            rotate(scene->rotations[i], result);
+            result = rotate(rotations[id], result);
         }
     }
     return result;
 }
 
 
-bool Scene::is_visible(double diff, double num, double t_e, double t_l){
-    double t;
-    if(diff > 0){
-        t = num/diff;
+bool Scene::is_visible(double diff, double num, double &t_e, double &t_l){
+    double t = num/diff;
 
+    if(diff > 0){
         if (t > t_l){
             return false;
         }
@@ -462,7 +492,7 @@ bool Scene::is_visible(double diff, double num, double t_e, double t_l){
     return true;
 }
 
-bool Scene::clipping(Camera *cam, Vec4 point1, Vec4 point2){
+bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
     //each line will enter and leave twice,
     // if first L(eave) is before last E(ntrance) -> not visible/False
     // if t_pl < t_pe : return false
@@ -477,10 +507,10 @@ bool Scene::clipping(Camera *cam, Vec4 point1, Vec4 point2){
 
     if(is_visible(dx, xmin-point1.x, t_pe, t_pl)){
         if (is_visible(dx*(-1), (point1.x-xmax), t_pe, t_pl)){
-            if (dy, (ymin-point1.y), t_pe, t_pl){
-                if (dy*(-1), (point1.y-ymax), t_pe, t_pl ){
-                    if (dz, (zmin -point1.z ),t_pe, t_pl){
-                        if (dz*(-1), (point1.z - zmax),t_pe, t_pl){
+            if (is_visible(dy, (ymin-point1.y), t_pe, t_pl)){
+                if (is_visible(dy*(-1), (point1.y-ymax), t_pe, t_pl)){
+                    if (is_visible(dz, (zmin -point1.z ),t_pe, t_pl)){
+                        if (is_visible(dz*(-1), (point1.z - zmax), t_pe, t_pl)){
                             visible = true;
                             if(t_pl < 1){
                                 point2.x = point1.x + dx*t_pl;
@@ -521,27 +551,27 @@ Matrix4 Scene::projection(Camera *cam){
     Matrix4 m_orth = getIdentityMatrix();
     double r_l = r - l, t_b = t - b, f_n = f - n;
 
+    /*do M_orth
+     *
+     * ask if perspective, if yes calculate P20 and return the product.*/
+
     m_orth.values[0][0] = 2/r_l;
-    m_orth.values[0][3] = -1*(r+r)/r_l;
+    m_orth.values[0][3] = -(r+l)/r_l;
     m_orth.values[1][1] = 2/t_b;
-    m_orth.values[1][3] = -1*(t+b)/t_b;
+    m_orth.values[1][2] = -(t+b)/t_b;
     m_orth.values[2][2] = -2/f_n;
-    m_orth.values[2][3] = -1*(f+n)/f_n;
+    m_orth.values[2][3] = -(f+n)/f_n;
 
-
-    if(!cam->projectionType){
-        //do perspective projection
+    if(cam->projectionType == ORTOGRAPHIC_PROJECTION){
+        return m_orth;
+    } else{
         p2o.values[0][0] = n;
         p2o.values[1][1] = n;
         p2o.values[2][2] = f+n;
         p2o.values[2][3] = f*n;
         p2o.values[3][2] = -1;
 
-        Matrix4 m_per = m_orth*p2o;
-        return m_per;
-
-    } else{
-        return m_orth;
+        return m_orth*p2o;
     }
 
 }
@@ -556,6 +586,7 @@ Matrix4 Scene::viewportTransformation(Camera *cam){
     m_vp.values[2][2] = 0.5;
     m_vp.values[2][3] = 0.5;
 
+    return m_vp;
 }
 
 Vec4 Scene::perspectiveDivide(Vec4 vec){
@@ -564,18 +595,20 @@ Vec4 Scene::perspectiveDivide(Vec4 vec){
         return vec;
     }
 
+    Vec4 result;
+
     if (vec.t != 0){
-        vec.x = vec.x/vec.t;
-        vec.y = vec.y/vec.t;
-        vec.z = vec.z/vec.t;
-        vec.t = 1.0;
+        result.x = vec.x/vec.t;
+        result.y = vec.y/vec.t;
+        result.z = vec.z/vec.t;
+        result.t = 1.0;
     }
 
-    return vec;
+    return result;
 }
 
 
-void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Camera *cam, std::vector<std::vector<double>> depthBuffer){
+void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1, Camera *cam, std::vector<std::vector<double> > &buffer){
 
     double x0 = vertex0.x, y0 = vertex0.y, x1 = vertex1.x, y1 = vertex1.y, z0 = vertex0.z, z1 = vertex1.z;
     double dx = abs(x1 - x0), dy = abs(y1 - y0), dz;
@@ -587,9 +620,10 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
     if (dx == 0){
         if(dy == 0){
             depth = z0;
-            if(x0 >= 0 && x0 < cam->horRes && y0 >= 0 && y0 < cam->verRes && depthBuffer[x0][y0] >= depth){
-                this->image[x0][y0] = c1;
-                depthBuffer[x0][y0] = depth;
+            if(x0 >= 0 && x0 < cam->horRes && y0 >= 0 && y0 < cam->verRes && buffer[x0][y0] >= depth){
+                buffer[x0][y0] = depth;
+                image[x0][y0] = c1;
+
             }
             return;
         } else{
@@ -598,10 +632,10 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
             depth = z0;
             dz = (z1-z0)/dy;
 
-            for (int y = y0; y != y1 +sy && x0>= 0 && x0 < cam->horRes && y>= 0 && y < cam->verRes; y+=sy) {
-                if(depthBuffer[x0][y] >= depth){
-                    this->image[x0][y] = c;
-                    depthBuffer[x0][y] = depth;
+            for (double y = y0; y != y1 +sy && x0>= 0 && x0 < cam->horRes && y>= 0 && y < cam->verRes; y += sy) {
+                if(buffer[x0][y] >= depth){
+                    buffer[x0][y] = depth;
+                    image[x0][y] = c;
                 }
 
                 depth += dz;
@@ -615,9 +649,10 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
         dz = (z1-z0)/dx;
 
         for (int x = x0; x != x1 +sx && x>= 0 && x < cam->horRes && y0>= 0 && y0 < cam->verRes; x+=sx) {
-            if(depthBuffer[x][y0] >= depth){
-                this->image[x][y0] = c;
-                depthBuffer[x][y0] = depth;
+            if(buffer[x][y0] >= depth){
+                buffer[x][y0] = depth;
+                image[x][y0] = c;
+
             }
             depth += dz;
             c = c + dc;
@@ -632,9 +667,9 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
         error = 2*dy-dx;
 
         for (int x = x0, y = y0; x != x1 + sx && x>= 0 && x < cam->horRes && y>= 0 && y < cam->verRes; x+=sx) {
-            if(depthBuffer[x][y] > depth){
-                depthBuffer[x][y] = depth;
-                this->image[x][y] = c;
+            if(buffer[x][y] > depth){
+                buffer[x][y] = depth;
+                image[x][y] = c;
             }
             if (error >= 0){
                 y += sy;
@@ -652,9 +687,9 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
         dz = (z1-z0)/dy;
 
         for (int x = x0, y = y0; y != y1 + sy && x>= 0 && x < cam->horRes && y>= 0 && y < cam->verRes; y+=sy){
-            if (depthBuffer[x][y] > depth){
-                depthBuffer[x][y] = depth;
-                this->image[x][y] = c;
+            if (buffer[x][y] > depth){
+                buffer[x][y] = depth;
+                image[x][y] = c;
             }
             if (error >= 0){
                 x += sx;
@@ -666,11 +701,9 @@ void Scene::lineRasterization(Vec4 vertex0, Vec4 vertex1, Color c0, Color c1, Ca
             c = c + dc;
         }
     }
-
-
 }
 
-void Scene::triangleRasterization(Vec4 vertex0 , Vec4 vertex1, Vec4 vertex2, Color c0, Color c1, Color c2,Camera *cam, std::vector<std::vector<double>> depthBuffer){
+void Scene::triangleRasterization(Vec4 &vertex0 , Vec4 &vertex1, Vec4 &vertex2, Color &c0, Color &c1, Color &c2,Camera *cam, std::vector<std::vector<double> > &buffer){
     double x0 = vertex0.x, y0 = vertex0.y, z0 = vertex0.z;
     double x1 = vertex1.x, y1 = vertex1.y, z1 = vertex1.z;
     double x2 = vertex2.x, y2 = vertex2.y, z2 = vertex2.z;
@@ -700,10 +733,10 @@ void Scene::triangleRasterization(Vec4 vertex0 , Vec4 vertex1, Vec4 vertex2, Col
 
             if (a >= 0 && b >= 0 && c >= 0){
                 double depth = a*z0 + b*z1 + c*z2;
-                if (depthBuffer[x][y] >= depth){
-                    depthBuffer[x][y] = depth;
+                if (buffer[x][y] >= depth){
+                    buffer[x][y] = depth;
                     Color color(c0*a + c1*b + c2*c);
-                    this->image[x][y] = color;
+                    image[x][y] = color;
                 }
             }
         }
@@ -718,12 +751,6 @@ bool Scene::backfaceCheck(Vec4 vertex0, Vec4 vertex1, Vec4 vertex2){
     Vec3 temp = Vec3(vertex0.x, vertex0.y, vertex0.z, -1);
     return (dotProductVec3(normal,temp) < 0 );
 
-}
-
-
-void draw(int x, int y, Color c){
-    //ay bilmiyorum
-    //depth buffera göre kontrol edip ona göre renk atama??
 }
 
 
@@ -744,16 +771,15 @@ void Scene::forwardRenderingPipeline(Camera *camera){
      * rasterization (also color calculations) (solid vs wireframe aaaa)
      *
      * */
-    int nx = camera->horRes, ny = camera->verRes;
 
     Matrix4 camera_transformed = cameraTransformation(camera);
     Matrix4 projected = projection(camera);
     Matrix4 viewport = viewportTransformation(camera);
-    Matrix4 p_c= projected*camera_transformed;
+    Matrix4 p_c= multiplyMatrixWithMatrix(projected, camera_transformed);
 
     for (Mesh *mesh : this->meshes) {
-        Matrix4 model_transformed = modeling_transformation(this, mesh);
-        Matrix4 M_p_c_m = model_transformed*p_c;
+        Matrix4 model_transformed = modeling_transformation(mesh);
+        Matrix4 M_p_c_m = multiplyMatrixWithMatrix(p_c, model_transformed);
 
         for (int i = 0; i < mesh->numberOfTriangles; ++i) {
             Triangle triangle = mesh->triangles[i];
@@ -780,7 +806,11 @@ void Scene::forwardRenderingPipeline(Camera *camera){
             thirdVertex = Vec4(multiplyMatrixWithVec4(M_p_c_m, thirdVertex));
 
             if (cullingEnabled) {
-                continue;
+                bool backfacing = backfaceCheck(firstVertex, secondVertex, thirdVertex);
+
+                if(backfacing){
+                    continue;
+                }
             }
 
             if (camera->projectionType == PERSPECTIVE_PROJECTION) {
@@ -798,8 +828,8 @@ void Scene::forwardRenderingPipeline(Camera *camera){
 
 
                 bool clipped_line0 = clipping(camera, firstVertex, secondVertex);
-                bool clipped_line1 = clipping(camera, secondVertex, thirdVertex);
-                bool clipped_line2 = clipping(camera, thirdVertex, firstVertex);
+                bool clipped_line1 = clipping(camera, temp1, thirdVertex);
+                bool clipped_line2 = clipping(camera, temp2, temp0);
 
                 firstVertex = multiplyMatrixWithVec4(viewport, firstVertex);
                 secondVertex = multiplyMatrixWithVec4(viewport, secondVertex);
@@ -816,13 +846,13 @@ void Scene::forwardRenderingPipeline(Camera *camera){
 
                 if (clipped_line1) {
                     // line rasterization secondVertex, thirdVertex
-                    lineRasterization(secondVertex, thirdVertex, color1, color2, camera, depthBuffer);
+                    lineRasterization(temp1, thirdVertex, color1, color2, camera, depthBuffer);
 
                 }
 
                 if (clipped_line2) {
                     // line rasterization thirdVertex, firstVertex
-                    lineRasterization(thirdVertex, firstVertex, color2, color0, camera, depthBuffer);
+                    lineRasterization(temp2, temp0, color2, color0, camera, depthBuffer);
 
                 }
 

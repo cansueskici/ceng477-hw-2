@@ -3,7 +3,7 @@
 #define WIREFRAME_MESH 0
 #define SOLID_MESH 1
 #include "Triangle.h"
-
+#include <vector>
 class Mesh
 {
 
