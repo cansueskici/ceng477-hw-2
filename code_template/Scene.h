@@ -33,7 +33,7 @@ public:
 	void writeImageToPPMFile(Camera *camera);
 	void convertPPMToPNG(std::string ppmFileName, int osType);
 	void forwardRenderingPipeline(Camera *camera);
-
+    Color clamp(Color &color);
     void initializeDepthBuffer(Camera *camera);
     Matrix4 translate(Translation *translation, Matrix4 &matrix);
     Matrix4 scale(Scaling *scaling, Matrix4 &matrix);
