@@ -764,16 +764,16 @@ void Scene::triangleRasterization(Vec4 &vertex0 , Vec4 &vertex1, Vec4 &vertex2, 
     double d1_2 = x0*(y1-y2) + y0*(x2-x1) + x1*y2 - y1*x2;
     double d2_0 = x1*(y2-y0) + y1*(x0-x2) + x2*y0 - y2*x0;
 
-    double x_min = min({x0, x1, x2});
+    double x_min = min(x0, min(x1, x2));
     x_min = max(x_min, 0.0);
 
-    double x_max = max({x0, x1, x2});
+    double x_max = max(x0, max(x1, x2));
     x_max = min(x_max, double(cam->horRes-1));
 
-    double y_min = min({y0, y1, y2});
+    double y_min = min(y0, min(y1, y2));
     y_min = max(y_min, 0.0);
 
-    double y_max = max({y0, y1, y2});
+    double y_max = max(y0, max(y1, y2));
     y_max = min(y_max, double(cam->verRes-1));
 
     for (int y = y_min; y <= y_max ; ++y) {
