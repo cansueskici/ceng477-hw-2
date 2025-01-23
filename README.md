@@ -1,2 +1,4 @@
-# ceng477-hw-2
-Second Homework of CENG477
+# CENG477 Assignment 2
+Second Assignment of CENG477, Computer Graphics
+
+
