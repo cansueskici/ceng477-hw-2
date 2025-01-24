@@ -45,6 +45,7 @@ public:
     Matrix4 projection(Camera *cam);
     Matrix4 viewportTransformation(Camera *cam);
     Vec4 perspectiveDivide(Vec4 vec);
+    void depthBufferCheck(int x, int y, double depth, Color &c);
     void lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1, Camera *cam, std::vector<std::vector<double> > &buffer);
     void triangleRasterization(Vec4 &vertex0 , Vec4 &vertex1, Vec4 &vertex2, Color &c0, Color &c1, Color &c2,Camera *cam, std::vector<std::vector<double> > &buffer);
     bool backfaceCheck(Vec4 vertex0, Vec4 vertex1, Vec4 vertex2);

@@ -516,6 +516,8 @@ bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
     double xmin = -1, ymin = -1, zmin = -1;
     double xmax = 1, ymax = 1, zmax = 1;
 
+    double what = sqrt(pow(dx ,2) + pow(dy, 2) + pow(dz, 2));
+
     if(is_visible(dx, xmin-point1.x, t_pe, t_pl)){
         if (is_visible(dx*(-1), (point1.x-xmax), t_pe, t_pl)){
             if (is_visible(dy, (ymin-point1.y), t_pe, t_pl)){
@@ -527,6 +529,7 @@ bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
                                 point2.x = point1.x + dx*t_pl;
                                 point2.y = point1.y + dy*t_pl;
                                 point2.z = point1.z + dz*t_pl;
+
                             }
 
                             if (t_pe > 0){
@@ -618,140 +621,119 @@ Vec4 Scene::perspectiveDivide(Vec4 vec){
     return result;
 }
 
+void Scene::depthBufferCheck(int x, int y, double depth, Color &c){
+    if(x<0 || y<0 || x>=this->image.size() || y>= this->image[0].size()){
+        return;
+    }
 
-void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1, Camera *cam, std::vector<std::vector<double> > &buffer){
+    if(0 <= depth && depth <= 1 && depth < this->depthBuffer[x][y]){
+        this->depthBuffer[x][y] = depth;
+        this->image[x][y] = c;
+    }
+}
+
+// deneysel
+void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1, Camera *cam, std::vector<std::vector<double> > &buffer) {
     double x0 = vertex0.x, y0 = vertex0.y, z0 = vertex0.z, x1 = vertex1.x, y1 = vertex1.y, z1 = vertex1.z;
+    double m, depth, multiplier, inc, dec;
+    Color c;
+
+    if (x0 == x1) {
+        m = y1 > y0 ? MAXFLOAT : INT32_MIN;
+    } else {
+        m = (y1 - y0) / (x1 - x0);
+    }
 
     if (x0 > x1) {
-        swap(x0, x1);
-        swap(y0, y1);
-        swap(z0, z1);
+        swap(vertex0, vertex1);
         swap(c0, c1);
     }
 
-    double dx = x1 - x0, dy = y1 - y0, dz, depth = z0;
-    double slope = dy / dx;
-    Color dc = (c1-c0)/dx, c = c0;
+    if (m > 0 && m <= 1.0) { //0,1
+        double y = y0;
+        double d = (y0 - y1) + ((x1 - x0) / 2);
+        inc = (y0 - y1) + (x1 - x0);
+        dec = y0 - y1;
 
-
-
-    if(dx == 0){
-        if(y0>y1){
-            swap(y0,y1);
-        }
-        for (int y = y0; y <= y1; y++) {
-            if (x0 >= 0 && y >= 0 && x0 < cam->horRes && y < cam->verRes) {
-                if (buffer[x0][y] > depth) {
-                    buffer[x0][y] = depth;
-                    image[x0][y] = clamp(c);
-                }
-            }
-            depth += dz / abs(dy);
-            c = c + dc;
-        }
-
-
-    }else if(dy == 0){
-        double sx = (x1 > x0)? 1: -1;
-        for (int x = x0; x <= x1; x += sx) {
-            if (x >= 0 && y0 >= 0 && x < cam->horRes && y0 < cam->verRes) {
-                if (buffer[x][y0] > depth) {
-                    buffer[x][y0] = depth;
-                    image[x][y0] = clamp(c);
-                }
-            }
-            depth += dz / (x1-x0);
-            c = c + dc;
-        }
-
-    }else if (slope >= -1.0 && slope <= 0.0) { // -1, 0
-        double d = 2 * dy + dx;
-        dc = (c1 - c0) / dx;
-        dz = (z1 - z0) / dx;
-
-        for (int x = x0, y = y0; x <= x1; x++) {
-            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes) {
-                if(buffer[x][y] > depth){
-                    buffer[x][y] = depth;
-                    image[x][y] = clamp(c);
-                }
-            }
+        for (int x = x0; x <= x1; x++) {
+            multiplier = (x - x0) / (x1 - x0);
+            c = c0 * (1 - multiplier) + c1 * multiplier;
+            depth = z0 * (1 - multiplier) + z1 * multiplier;
+            depthBufferCheck(x, y, depth, c);
             if (d < 0) {
-                d += 2 * dy;
-            } else {
-                y--;
-                d += 2 * (dy + dx);
-
-            }
-            depth += dz;
-            c = c + dc;
-        }
-
-    } else if (slope < -1.0) { // -infinity, -1
-        double d = 2 * dx + dy;
-        dc = (c1 - c0) / abs(dy);
-        dz = (z1 - z0) / abs(dy);
-
-        for (int y = y0, x = x0; y >=y1 && x<=x1; y--) {
-            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes ) {
-                if(buffer[x][y] > depth){
-                    buffer[x][y] = depth;
-                    image[x][y] = clamp(c);
-                }
-            }
-            if (d < 0) {
-                d += 2 * dx;
-
-            } else {
-                x++;
-                d += 2 * (dx + dy);
-            }
-            depth += dz;
-            c = c + dc;
-        }
-    } else if (slope >= 0 && slope <= 1.0) { //0,1
-        double d = 2 * dy - dx;
-        dc = (c1 - c0) / dx;
-        dz = (z1 - z0) / dx;
-
-        for (int x = x0, y = y0; x <= x1 && y<=y1; x++) {
-            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes) {
-                if(buffer[x][y] > depth){
-                    buffer[x][y] = depth;
-                    image[x][y] = clamp(c);
-                }
-            }
-            if (d < 0) {
-                d += 2 * dy;
-            } else {
                 y++;
-                d += 2 * (dy - dx);
-            }
-            depth += dz;
-            c = c + dc;
-        }
-
-    } else { // 1, infinity
-        double d = 2 * dx - dy;
-        dc = (c1 - c0) / abs(dy);
-        dz = (z1 - z0) / abs(dy);
-
-        for (int y = y0, x = x0; x<=x1 && y <= y1; y++) {
-            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes) {
-                if( buffer[x][y] > depth){
-                    buffer[x][y] = depth;
-                    image[x][y] = clamp(c);
-                }
-            }
-            if (d < 0) {
-                d += 2 * dx;
+                d += inc;
             } else {
-                x++;
-                d += 2 * (dx - dy);
+                d += dec;
             }
-            depth += dz;
-            c = c + dc;
         }
+
+    } else if (m > 1.0) {
+        double x = x0;
+        double d = (x0 - x1) + ((y1 - y0) / 2);
+
+        inc = (x0 - x1) + (y1 - y0);
+        dec = x0 - x1;
+
+        for (int y = y0; y <= y1; y++) {
+            multiplier = (y - y0) / (y1 - y0);
+            c = c0 * (1 - multiplier) + c1 * multiplier;
+            depth = z0 * (1 - multiplier) + z1 * multiplier;
+            depthBufferCheck(x, y, depth, c);
+
+            if (d < 0) {
+                x++;
+                d += inc;
+            } else {
+                d += dec;
+            }
+
+        }
+
+    } else if (m <= 0 && m >= -1.0) {
+        double y = y1;
+        double d = -(y0 - y1) + ((x1 - x0) / 2);
+        inc = -(y0 - y1) + (x1 - x0);
+        dec = y1 - y0;
+
+        for (int x = x1; x >= x0; x--) {
+//            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes) {
+//            }
+            multiplier = (x - x0) / (x1 - x0);
+            c = c0 * (1 - multiplier) + c1 * multiplier;
+            depth = z0 * (1 - multiplier) + z1 * multiplier;
+            depthBufferCheck(x, y, depth, c);
+            if (d < 0) {
+                y++;
+                d += inc;
+            } else {
+                d += dec;
+            }
+        }
+
+
+    } else if (m < -1.0) {
+        double x = x0;
+        double d = (x0 - x1) - ((y1 - y0) / 2);
+
+        inc = (x0 - x1) - (y1 - y0);
+        dec = x0 - x1;
+
+        for (int y = y0; y >= y1; y--) {
+            multiplier = (y - y0) / (y1 - y0);
+            c = c0 * (1 - multiplier) + c1 * multiplier;
+            depth = z0 * (1 - multiplier) + z1 * multiplier;
+            depthBufferCheck(x, y, depth, c);
+
+            if (d < 0) {
+                x++;
+                d += inc;
+            } else {
+                d += dec;
+            }
+
+        }
+
     }
 }
 
