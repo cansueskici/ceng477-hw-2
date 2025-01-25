@@ -40,7 +40,7 @@ public:
     Matrix4 rotate(Rotation *rotation, Matrix4 &matrix);
     Matrix4 modeling_transformation(Mesh *mesh);
     bool is_visible(double diff, double num, double &t_e, double &t_l);
-    bool clipping(Camera *cam, Vec4 &point1, Vec4 &point2);
+    bool clipping(Camera *cam, Vec4 &point1, Vec4 &point2, Color &c0, Color &c1);
     Matrix4 cameraTransformation(Camera *cam);
     Matrix4 projection(Camera *cam);
     Matrix4 viewportTransformation(Camera *cam);

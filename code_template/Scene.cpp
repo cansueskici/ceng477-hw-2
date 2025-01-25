@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <cfloat>
 
 #include "tinyxml2.h"
 #include "Triangle.h"
@@ -503,7 +504,7 @@ bool Scene::is_visible(double diff, double num, double &t_e, double &t_l){
     return true;
 }
 
-bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
+bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2, Color &c0, Color &c1){
     //each line will enter and leave twice,
     // if first L(eave) is before last E(ntrance) -> not visible/False
     // if t_pl < t_pe : return false
@@ -513,10 +514,11 @@ bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
     double dx = point2.x - point1.x;
     double dy = point2.y - point1.y;
     double dz = point2.z - point1.z;
+    double dr = c1.r-c0.r, dg = c1.g-c0.g, db = c1.b-c0.b;
     double xmin = -1, ymin = -1, zmin = -1;
     double xmax = 1, ymax = 1, zmax = 1;
-
     double what = sqrt(pow(dx ,2) + pow(dy, 2) + pow(dz, 2));
+    double doubled = sqrt(dx*dx+ dy*dy + dz*dz);
 
     if(is_visible(dx, xmin-point1.x, t_pe, t_pl)){
         if (is_visible(dx*(-1), (point1.x-xmax), t_pe, t_pl)){
@@ -529,13 +531,13 @@ bool Scene::clipping(Camera *cam, Vec4 &point1, Vec4 &point2){
                                 point2.x = point1.x + dx*t_pl;
                                 point2.y = point1.y + dy*t_pl;
                                 point2.z = point1.z + dz*t_pl;
-
                             }
 
                             if (t_pe > 0){
-                                point1.x = point1.x + dx*t_pe;
-                                point1.y = point1.y + dy*t_pe;
-                                point1.z = point1.z + dz*t_pe;
+                                point1.x += dx*t_pe;
+                                point1.y += dy*t_pe;
+                                point1.z += dz*t_pe;
+
                             }
                         }
                     }
@@ -632,31 +634,31 @@ void Scene::depthBufferCheck(int x, int y, double depth, Color &c){
     }
 }
 
-// deneysel
 void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1, Camera *cam, std::vector<std::vector<double> > &buffer) {
-    double x0 = vertex0.x, y0 = vertex0.y, z0 = vertex0.z, x1 = vertex1.x, y1 = vertex1.y, z1 = vertex1.z;
-    double m, depth, multiplier, inc, dec;
+    double m, depth, inc, dec;
     Color c;
 
-    if (x0 == x1) {
-        m = y1 > y0 ? MAXFLOAT : INT32_MIN;
+    if (vertex0.x == vertex1.x) {
+        m = vertex1.y > vertex0.y ? MAXFLOAT : FLT_MIN;
     } else {
-        m = (y1 - y0) / (x1 - x0);
+        m = (vertex1.y - vertex0.y) / (vertex1.x - vertex0.x);
     }
 
-    if (x0 > x1) {
+    if (vertex0.x > vertex1.x) {
         swap(vertex0, vertex1);
         swap(c0, c1);
     }
 
-    if (m > 0 && m <= 1.0) { //0,1
+    double x0 = vertex0.x, y0 = vertex0.y, z0 = vertex0.z, x1 = vertex1.x, y1 = vertex1.y, z1 = vertex1.z;
+
+    if (m > 0 && m <= 1.0) { //(0,1]
         double y = y0;
         double d = (y0 - y1) + ((x1 - x0) / 2);
         inc = (y0 - y1) + (x1 - x0);
         dec = y0 - y1;
 
         for (int x = x0; x <= x1; x++) {
-            multiplier = (x - x0) / (x1 - x0);
+            double multiplier = (x - x0) / (x1 - x0);
             c = c0 * (1 - multiplier) + c1 * multiplier;
             depth = z0 * (1 - multiplier) + z1 * multiplier;
             depthBufferCheck(x, y, depth, c);
@@ -668,7 +670,7 @@ void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1
             }
         }
 
-    } else if (m > 1.0) {
+    } else if (m > 1.0) { //(1,inf)
         double x = x0;
         double d = (x0 - x1) + ((y1 - y0) / 2);
 
@@ -676,7 +678,7 @@ void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1
         dec = x0 - x1;
 
         for (int y = y0; y <= y1; y++) {
-            multiplier = (y - y0) / (y1 - y0);
+            double multiplier = (y - y0) / (y1 - y0);
             c = c0 * (1 - multiplier) + c1 * multiplier;
             depth = z0 * (1 - multiplier) + z1 * multiplier;
             depthBufferCheck(x, y, depth, c);
@@ -690,16 +692,14 @@ void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1
 
         }
 
-    } else if (m <= 0 && m >= -1.0) {
+    } else if (m <= 0 && m >= -1.0) { //[-1,0]
         double y = y1;
         double d = -(y0 - y1) + ((x1 - x0) / 2);
         inc = -(y0 - y1) + (x1 - x0);
         dec = y1 - y0;
 
         for (int x = x1; x >= x0; x--) {
-//            if (x >= 0 && y >= 0 && x < cam->horRes && y < cam->verRes) {
-//            }
-            multiplier = (x - x0) / (x1 - x0);
+            double multiplier = (x - x0) / (x1 - x0);
             c = c0 * (1 - multiplier) + c1 * multiplier;
             depth = z0 * (1 - multiplier) + z1 * multiplier;
             depthBufferCheck(x, y, depth, c);
@@ -712,7 +712,7 @@ void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1
         }
 
 
-    } else if (m < -1.0) {
+    } else if (m < -1.0) { //(-inf,-1)
         double x = x0;
         double d = (x0 - x1) - ((y1 - y0) / 2);
 
@@ -720,7 +720,7 @@ void Scene::lineRasterization(Vec4 &vertex0, Vec4 &vertex1, Color &c0, Color &c1
         dec = x0 - x1;
 
         for (int y = y0; y >= y1; y--) {
-            multiplier = (y - y0) / (y1 - y0);
+            double multiplier = (y - y0) / (y1 - y0);
             c = c0 * (1 - multiplier) + c1 * multiplier;
             depth = z0 * (1 - multiplier) + z1 * multiplier;
             depthBufferCheck(x, y, depth, c);
@@ -861,9 +861,9 @@ void Scene::forwardRenderingPipeline(Camera *camera){
                 Vec4 temp2 = thirdVertex;
 
 
-                bool clipped_line0 = clipping(camera, firstVertex, secondVertex);
-                bool clipped_line1 = clipping(camera, secondVertex, thirdVertex);
-                bool clipped_line2 = clipping(camera, thirdVertex, firstVertex);
+                bool clipped_line0 = clipping(camera, firstVertex, secondVertex, color0, color1);
+                bool clipped_line1 = clipping(camera, secondVertex, thirdVertex, color1, color2);
+                bool clipped_line2 = clipping(camera, thirdVertex, firstVertex, color2, color0);
 
                 firstVertex = multiplyMatrixWithVec4(viewport, firstVertex);
                 secondVertex = multiplyMatrixWithVec4(viewport, secondVertex);
